@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MARIOBOT - Remote Control</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --bg2: #111111;
+      --bg3: #1a1a1a;
+      --border: #2a2a2a;
+      --red: #e63946;
+      --orange: #f4881a;
+      --dim: #444444;
+      --text: #d4d4d4;
+      --muted: #666666;
+      --green: #4ade80;
+      --mono: 'Share Tech Mono', monospace;
+      --display: 'Bebas Neue', cursive;
+      --glow-r: 0 0 8px rgba(230, 57, 70, 0.4), 0 0 20px rgba(230, 57, 70, 0.15);
+      --glow-o: 0 0 8px rgba(244, 136, 26, 0.4), 0 0 20px rgba(244, 136, 26, 0.15);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      min-height: 100vh;
+      padding-bottom: 40px;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: repeating-linear-gradient(to bottom, transparent 0px, transparent 3px, rgba(0,0,0,.08) 3px, rgba(0,0,0,.08) 4px);
+      pointer-events: none;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .logo {
+      font-family: var(--display);
+      font-size: 2rem;
+      letter-spacing: .12em;
+      color: var(--red);
+      text-shadow: var(--glow-r);
+    }
+    .logo span { color: var(--orange); text-shadow: var(--glow-o); }
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .8rem;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--dim);
+      transition: background .3s, box-shadow .3s;
+    }
+    .status-dot.on { background: var(--green); box-shadow: 0 0 8px rgba(74, 222, 128, 0.6); }
+    .status-dot.off { background: var(--red); box-shadow: var(--glow-r); }
+
+    .server-bar {
+      background: var(--bg3);
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .server-bar label {
+      font-size: .75rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .server-bar input {
+      flex: 1;
+      min-width: 240px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      padding: 20px 24px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    @media(max-width: 640px) {
+      .grid { grid-template-columns: 1fr; padding: 12px; }
+      header, .server-bar { padding: 12px; }
+    }
+
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 18px;
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--red), var(--orange));
+    }
+    .card.span2 { grid-column: span 2; }
+    @media(max-width: 640px) { .card.span2 { grid-column: span 1; } }
+
+    .card-title {
+      font-family: var(--display);
+      font-size: 1.1rem;
+      letter-spacing: .15em;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+    .now-playing {
+      font-size: .9rem;
+      color: var(--orange);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 6px;
+      text-shadow: var(--glow-o);
+      min-height: 1.2em;
+    }
+    .now-playing.idle { color: var(--dim); text-shadow: none; }
+    .queue-count { font-size: .75rem; color: var(--muted); margin-bottom: 14px; }
+
+    .music-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .btn {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: .8rem;
+      padding: 9px 14px;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: all .15s;
+      letter-spacing: .05em;
+    }
+    .btn:hover { border-color: var(--red); color: var(--red); box-shadow: var(--glow-r); }
+    .btn:active { background: #1f0000; }
+    .btn.primary { border-color: var(--red); color: var(--red); font-size: 1.1rem; padding: 9px 18px; }
+    .btn.icon { font-size: 1.1rem; padding: 9px 12px; }
+    .btn:disabled { opacity: .3; cursor: not-allowed; }
+    .btn.danger {
+      border-color: #ff0000;
+      color: #ff0000;
+      background: #1a0000;
+      font-size: .85rem;
+      padding: 10px 16px;
+      letter-spacing: .1em;
+      width: 100%;
+    }
+    .btn.danger:hover { background: #2a0000; box-shadow: 0 0 16px rgba(255, 0, 0, 0.5); }
+
+    .search-row { display: flex; gap: 8px; margin-top: 12px; }
+    input[type=text], input[type=url], input[type=range] {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: .8rem;
+      padding: 9px 12px;
+      border-radius: 3px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    input[type=text], input[type=url] { flex: 1; }
+    input[type=text]:focus, input[type=url]:focus { border-color: var(--red); }
+    input[type=text]::placeholder, input[type=url]::placeholder { color: var(--muted); }
+
+    .vol-row { display: flex; align-items: center; gap: 12px; }
+    .vol-value {
+      font-family: var(--display);
+      font-size: 2.2rem;
+      color: var(--orange);
+      text-shadow: var(--glow-o);
+      min-width: 3ch;
+      text-align: right;
+    }
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      flex: 1;
+      height: 4px;
+      padding: 0;
+      background: linear-gradient(to right, var(--orange) 0%, var(--orange) var(--pct,50%), var(--border) var(--pct,50%));
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: var(--orange);
+      box-shadow: var(--glow-o);
+      cursor: pointer;
+    }
+    .vol-btns { display: flex; gap: 8px; margin-top: 12px; }
+
+    .eyes-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .memory-box {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 12px;
+      font-size: .75rem;
+      color: var(--muted);
+      max-height: 160px;
+      overflow-y: auto;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+    .memory-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+    #queue-list {
+      list-style: none;
+      max-height: 140px;
+      overflow-y: auto;
+      margin-top: 10px;
+      font-size: .75rem;
+    }
+    #queue-list li {
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #queue-list li.playing { color: var(--orange); }
+    #queue-list li.playing::before { content: '▶ '; color: var(--orange); }
+
+    .toggle-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+    .toggle-label { font-size: .75rem; color: var(--muted); }
+    .toggle { position: relative; width: 40px; height: 22px; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0; cursor: pointer;
+      background: var(--border); border-radius: 22px; transition: .2s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute; width: 16px; height: 16px;
+      border-radius: 50%; left: 3px; top: 3px; background: var(--muted); transition: .2s;
+    }
+    .toggle input:checked + .toggle-slider { background: #1f0000; }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(18px); background: var(--red); box-shadow: var(--glow-r); }
+
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg3);
+      border: 1px solid var(--red);
+      color: var(--red);
+      font-family: var(--mono);
+      font-size: .8rem;
+      padding: 10px 20px;
+      border-radius: 3px;
+      box-shadow: var(--glow-r);
+      opacity: 0;
+      transition: opacity .25s;
+      pointer-events: none;
+      z-index: 1000;
+      max-width: 90vw;
+      text-align: center;
+    }
+    #toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">MARIO<span>BOT</span> <span style="font-size:1rem;color:var(--muted)">REMOTE</span></div>
+  <div class="status-badge">
+    <span class="status-dot off" id="dot"></span>
+    <span id="status-text">Desconectado</span>
+  </div>
+</header>
+
+<div class="server-bar">
+  <label for="server-url">🌐 SERVIDOR BOT:</label>
+  <input type="url" id="server-url" placeholder="https://tu-ngrok.ngrok-free.app o http://localhost:8890" onchange="guardarServerUrl()">
+  <button class="btn" onclick="probarConexion()">CONECTAR</button>
+</div>
+
+<div class="grid">
+  <!-- Tarjeta Reproductor -->
+  <div class="card span2">
+    <div class="card-title">▶ Reproduciendo</div>
+    <div class="now-playing idle" id="now-playing">— nada suena ahorita chamaco —</div>
+    <div class="queue-count" id="queue-count">Cola: 0 canciones</div>
+    <div class="music-controls">
+      <button class="btn icon" onclick="musicCmd('prev')" title="Anterior">⏮</button>
+      <button class="btn icon primary" id="btn-pause" onclick="togglePause()" title="Pausa/Play">⏸</button>
+      <button class="btn icon" onclick="musicCmd('next')" title="Siguiente">⏭</button>
+      <button class="btn icon" onclick="musicCmd('reinicio')" title="Repetir">↺</button>
+      <button class="btn icon" onclick="musicCmd('mezclar')" title="Mezclar">⇌</button>
+      <button class="btn icon" onclick="limpiarCola()" title="Limpiar cola">🗑</button>
+      <button class="btn" onclick="silencioYa()" title="Silencio" style="border-color:#e63946;color:#e63946">🤫 SILENCIO</button>
+    </div>
+    <div style="margin-bottom:14px">
+      <button class="btn danger" onclick="pararTodo()" title="Parar todo y limpiar cola">⛔ PARAR TODO</button>
+    </div>
+    <div class="toggle-row">
+      <label class="toggle"><input type="checkbox" id="autoplay-toggle" onchange="toggleAutoplay(this)"><span class="toggle-slider"></span></label>
+      <span class="toggle-label">AUTOPLAY</span>
+      <span style="font-size:.7rem;color:var(--muted)" id="autoplay-label">desactivado</span>
+    </div>
+    <div class="search-row" style="margin-top:14px">
+      <input type="text" id="search-input" placeholder="buscar canción en YouTube..." onkeydown="if(event.key==='Enter')buscarCancion()">
+      <button class="btn" onclick="buscarCancion()">▶ PON</button>
+      <button class="btn" id="btn-add-queue" onclick="agregarCancion()">+ COLA</button>
+    </div>
+  </div>
+
+  <!-- Tarjeta Cola -->
+  <div class="card">
+    <div class="card-title">☰ Cola de Música</div>
+    <ul id="queue-list"><li style="color:var(--dim)">vacía</li></ul>
+  </div>
+
+  <!-- Tarjeta Volumen -->
+  <div class="card">
+    <div class="card-title">◈ Volumen</div>
+    <div class="vol-row">
+      <span class="vol-value" id="vol-value">—</span>
+      <input type="range" min="0" max="100" value="50" id="vol-slider" oninput="updateSliderBg(this)" onchange="setVolumen(this.value)">
+    </div>
+    <div class="vol-btns">
+      <button class="btn" style="flex:1" onclick="volCmd('bajar')">▼ BAJAR</button>
+      <button class="btn" style="flex:1" onclick="volCmd('subir')">▲ SUBIR</button>
+    </div>
+  </div>
+
+  <!-- Tarjeta Ojos -->
+  <div class="card">
+    <div class="card-title">◉ Ojos ESP32</div>
+    <div class="eyes-grid">
+      <button class="btn" onclick="ojosCmd('activar')">ACTIVAR</button>
+      <button class="btn" onclick="ojosCmd('desactivar')">DESACTIVAR</button>
+      <button class="btn" onclick="ojosCmd('pensando')">PENSAR</button>
+      <button class="btn" onclick="ojosCmd('izquierda')">← IZQ</button>
+      <button class="btn" onclick="ojosCmd('derecha')">DER →</button>
+      <button class="btn" onclick="ojosCmd('arriba')">↑ ARR</button>
+      <button class="btn" onclick="ojosCmd('abajo')">↓ ABA</button>
+      <button class="btn" onclick="ojosCmd('feliz')">FELIZ</button>
+      <button class="btn" onclick="ojosCmd('enojado')">ENOJADO</button>
+    </div>
+  </div>
+
+  <!-- Tarjeta Memoria -->
+  <div class="card span2">
+    <div class="card-title">◎ Memoria</div>
+    <div class="memory-box" id="memory-box">cargando memoria...</div>
+    <div class="memory-actions">
+      <input type="text" id="memory-input" placeholder="Agregar hecho manualmente..." style="flex:1" onkeydown="if(event.key==='Enter')guardarHecho()">
+      <button class="btn" onclick="guardarHecho()">GUARDAR</button>
+      <button class="btn" onclick="cargarMemoria()">↻ RECARGAR</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  let isPaused = false;
+
+  function getServerUrl() {
+    let url = document.getElementById('server-url').value.trim();
+    if (!url) url = localStorage.getItem('mariobot_server_url') || 'http://localhost:8890';
+    return url.replace(/\/+$/, '');
+  }
+
+  function guardarServerUrl() {
+    const url = getServerUrl();
+    localStorage.setItem('mariobot_server_url', url);
+    toast('URL del servidor guardada');
+    pollStatus();
+  }
+
+  function toast(msg, dur=2500) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), dur);
+  }
+
+  async function api(path, method='GET', body=null) {
+    const server = getServerUrl();
+    if (!server) return null;
+    try {
+      const opts = {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        }
+      };
+      if (body) opts.body = JSON.stringify(body);
+      const r = await fetch(server + path, opts);
+      const data = await r.json();
+      if (r.status === 503 && data?.bloqueado) {
+        toast('🎙️ ' + (data.msg || 'Mario está ocupado, espera.'), 2000);
+        return null;
+      }
+      return data;
+    } catch(e) {
+      return null;
+    }
+  }
+
+  async function probarConexion() {
+    guardarServerUrl();
+    const data = await api('/status');
+    if (data) toast('✅ Conectado con éxito a Don Mario!');
+    else toast('❌ No se pudo conectar al servidor.');
+  }
+
+  async function pollStatus() {
+    const data = await api('/status');
+    const dot = document.getElementById('dot');
+    const stxt = document.getElementById('status-text');
+    if (!data) {
+      dot.className = 'status-dot off';
+      stxt.textContent = 'Desconectado';
+      return;
+    }
+    dot.className = 'status-dot on';
+    stxt.textContent = data.modo_musica ? 'Reproduciendo' : 'En espera';
+    const np = document.getElementById('now-playing');
+    if (data.actual) { np.textContent = data.actual; np.classList.remove('idle'); }
+    else { np.textContent = '— nada suena ahorita chamaco —'; np.classList.add('idle'); }
+    document.getElementById('queue-count').textContent = `Cola: ${data.total} canción${data.total!==1?'es':''}`;
+    const ul = document.getElementById('queue-list');
+    if (data.cola && data.cola.length) {
+      ul.innerHTML = data.cola.map((t,i) => `<li class="${i===data.indice?'playing':''}">${t.titulo}</li>`).join('');
+    } else { ul.innerHTML = '<li style="color:var(--dim)">vacía</li>'; }
+    const tog = document.getElementById('autoplay-toggle');
+    tog.checked = data.autoplay;
+    const lbl = document.getElementById('autoplay-label');
+    lbl.textContent = data.autoplay ? 'activado' : 'desactivado';
+    lbl.style.color = data.autoplay ? 'var(--orange)' : '';
+    isPaused = !data.modo_musica;
+    document.getElementById('btn-pause').textContent = isPaused ? '▶' : '⏸';
+  }
+
+  async function musicCmd(cmd) {
+    const r = await api('/music/'+cmd, 'POST');
+    if (r?.msg) toast(r.msg);
+    pollStatus();
+  }
+
+  async function togglePause() {
+    if (!isPaused) { await api('/music/pause','POST'); isPaused=true; }
+    else { await api('/music/reinicio','POST'); isPaused=false; }
+    document.getElementById('btn-pause').textContent = isPaused?'▶':'⏸';
+    setTimeout(pollStatus, 400);
+  }
+
+  async function limpiarCola() {
+    await api('/music/limpiar','POST'); toast('Cola limpiada.'); pollStatus();
+  }
+
+  async function buscarCancion() {
+    const q = document.getElementById('search-input').value.trim();
+    if (!q) return;
+    toast(`Buscando "${q}"...`, 3000);
+    const r = await api('/music/play','POST',{query:q});
+    if (r?.msg) toast(r.msg);
+    document.getElementById('search-input').value = '';
+    setTimeout(pollStatus, 1500);
+  }
+
+  async function agregarCancion() {
+    const btn = document.getElementById('btn-add-queue');
+    if (btn.disabled) return;
+    const q = document.getElementById('search-input').value.trim();
+    if (!q) return;
+    btn.disabled = true;
+    btn.textContent = '⏳';
+    toast(`Agregando "${q}"...`, 3000);
+    const r = await api('/music/agregar','POST',{query:q});
+    if (r?.msg) toast(r.msg);
+    document.getElementById('search-input').value = '';
+    setTimeout(pollStatus, 1500);
+    setTimeout(() => { btn.disabled = false; btn.textContent = '+ COLA'; }, 3000);
+  }
+
+  async function silencioYa() {
+    await api('/music/pause','POST');
+    isPaused = true;
+    document.getElementById('btn-pause').textContent = '▶';
+    toast('🤫 Silencio.');
+    setTimeout(pollStatus, 400);
+  }
+
+  async function pararTodo() {
+    const r = await api('/music/stop','POST');
+    if (r?.msg) toast(r.msg);
+    isPaused = true;
+    document.getElementById('btn-pause').textContent = '▶';
+    pollStatus();
+  }
+
+  async function toggleAutoplay(el) {
+    const r = await api('/music/autoplay','POST',{activo:el.checked});
+    document.getElementById('autoplay-label').textContent = r?.autoplay?'activado':'desactivado';
+    document.getElementById('autoplay-label').style.color = r?.autoplay?'var(--orange)':'';
+    toast(`Autoplay ${r?.autoplay?'activado':'desactivado'}`);
+  }
+
+  function updateSliderBg(el) {
+    el.style.setProperty('--pct', el.value+'%');
+    document.getElementById('vol-value').textContent = el.value;
+  }
+
+  async function setVolumen(nivel) {
+    const r = await api('/volumen/set','POST',{nivel:parseInt(nivel)});
+    if (r?.volumen !== undefined) { document.getElementById('vol-value').textContent = r.volumen; toast(`Volumen: ${r.volumen}`); }
+  }
+
+  async function volCmd(dir) {
+    const r = await api('/volumen/'+dir,'POST');
+    if (r?.volumen !== undefined) { const sl=document.getElementById('vol-slider'); sl.value=r.volumen; updateSliderBg(sl); toast(`Volumen: ${r.volumen}`); }
+  }
+
+  async function ojosCmd(cmd) { await api('/ojos/'+cmd,'POST'); toast(`Ojos: ${cmd}`); }
+
+  async function cargarMemoria() {
+    const box = document.getElementById('memory-box');
+    box.textContent = 'Cargando...';
+    const server = getServerUrl();
+    const r = await fetch(server + '/status').then(x=>x.json()).catch(()=>null);
+    if (!r) { box.textContent = 'Sin conexión al bot.'; return; }
+    box.textContent = 'Memoria conectada correctamente.';
+  }
+
+  async function guardarHecho() {
+    const inp = document.getElementById('memory-input');
+    const h = inp.value.trim(); if (!h) return;
+    toast('Hecho enviado.'); inp.value='';
+  }
+
+  // Inicializar URL fija o guardada
+  const DEFAULT_NGROK_URL = 'https://darkish-elsewhere-unheated.ngrok-free.dev';
+  const savedUrl = localStorage.getItem('mariobot_server_url') || DEFAULT_NGROK_URL;
+  document.getElementById('server-url').value = savedUrl;
+
+  updateSliderBg(document.getElementById('vol-slider'));
+  pollStatus();
+  setInterval(pollStatus, 3000);
+</script>
+</body>
+</html>
